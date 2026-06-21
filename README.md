@@ -13,11 +13,13 @@
 2. 풀어낸 폴더에서 PowerShell로 실행합니다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\check-environment.ps1 -RequireClaude
-powershell -ExecutionPolicy Bypass -File install.ps1
+# 없는 준비물 자동 설치 (Claude Code · Codex · Node · Git)
+powershell -ExecutionPolicy Bypass -File .\scripts\install-dependencies.ps1
+# 설치
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-설치 후 `Ctrl+Alt+C` 또는 시작 메뉴의 `오르비스`로 엽니다.
+설치 후 `claude`로 본인 Claude 계정에 로그인하고, `Ctrl+Alt+C` 또는 시작 메뉴의 `오르비스`로 엽니다.
 
 ## 요구사항
 

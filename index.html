@@ -370,22 +370,25 @@
     <div class="wrap block-grid">
       <div class="block-aside"><p class="kicker"><span class="n">03</span> &nbsp;설치</p></div>
       <div class="block-main">
-        <h2 class="block-title">압축 풀고, 한 번 실행.</h2>
-        <p class="block-lead">Claude Code에 로그인돼 있으면 준비는 끝입니다.</p>
-        <ul class="req-list" style="margin-top:1.8rem;">
-          <li><b>Windows 10 / 11</b> — PowerShell 5.1 기본 포함</li>
-          <li><b>Claude Code</b> — 설치 후 본인 계정 로그인 <span class="opt">(필수)</span></li>
-          <li><b>Codex CLI</b> — ChatGPT 모드를 쓸 때 <span class="opt">(선택)</span></li>
-          <li><b>Node.js</b> — 컴퓨터 모드를 쓸 때 <span class="opt">(선택)</span></li>
-        </ul>
-        <div class="terminal">
+        <h2 class="block-title">받고, 깔고, 실행.</h2>
+        <p class="block-lead">준비물이 없어도 됩니다. 받은 ZIP 안의 스크립트가 Claude Code·Codex·Node.js를 <b>없는 것만</b> 설치합니다.</p>
+        <div class="terminal" style="margin-top:1.8rem;">
           <div class="terminal-top"><i></i><i></i><i></i><span>Windows PowerShell</span></div>
           <div class="terminal-body">
-            <span class="tline"><span class="c"># 압축 푼 폴더에서 환경 점검</span><code class="cmd">powershell -ExecutionPolicy Bypass -File .\scripts\check-environment.ps1 -RequireClaude</code></span>
-            <span class="tline"><span class="c"># 설치 후 Ctrl+Alt+C 로 열기</span><code class="cmd">powershell -ExecutionPolicy Bypass -File install.ps1</code></span>
+            <span class="tline"><span class="c"># 1 · 없는 준비물 자동 설치 (Claude Code · Codex · Node · Git)</span><code class="cmd">powershell -ExecutionPolicy Bypass -File .\scripts\install-dependencies.ps1</code></span>
+            <span class="tline"><span class="c"># 2 · 설치하고 Ctrl+Alt+C 로 열기</span><code class="cmd">powershell -ExecutionPolicy Bypass -File .\install.ps1</code></span>
           </div>
         </div>
-        <p class="install-note">서명되지 않은 앱이라 SmartScreen 경고가 뜰 수 있습니다. 위처럼 <code>-ExecutionPolicy Bypass</code>로 실행하면 됩니다. 함께 받은 <code>.sha256</code>로 무결성을 확인할 수 있습니다.</p>
+        <p class="install-note">끝나면 <code>claude</code>를 한 번 실행해 <b>본인 Claude 계정</b>으로 로그인하면 됩니다. ChatGPT 모드는 <code>codex login</code>.</p>
+
+        <p class="fg-label" style="margin-top:2.2rem;">준비물 — 직접 받기</p>
+        <ul class="req-list" style="margin-top:1.1rem;">
+          <li><b>Windows 10 / 11</b> <span class="opt">(필수)</span> — PowerShell 5.1 기본 포함, 별도 설치 불필요</li>
+          <li><b>Claude Code</b> <span class="opt">(필수)</span> — <code>irm https://claude.ai/install.ps1 | iex</code></li>
+          <li><b>Codex CLI</b> <span class="opt">(ChatGPT 모드)</span> — <code>irm https://chatgpt.com/codex/install.ps1 | iex</code></li>
+          <li><b>Node.js</b> <span class="opt">(컴퓨터 모드)</span> — <code>winget install OpenJS.NodeJS.LTS</code></li>
+        </ul>
+        <p class="install-note">서명되지 않은 앱이라 SmartScreen 경고가 뜰 수 있습니다. <code>-ExecutionPolicy Bypass</code>로 실행하고, 함께 받은 <code>.sha256</code>로 무결성을 확인하세요.</p>
       </div>
     </div>
   </section>

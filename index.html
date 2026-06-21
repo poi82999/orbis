@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbis — 화면 끝에 떠 있는 AI</title>
+<meta name="description" content="Claude와 ChatGPT 구독을 그대로 쓰는 작은 데스크톱 오브. 보던 화면을 떠나지 않고 묻고, 색만 보고 상태를 압니다. Windows 10/11." />
+<style>
+  :root {
+    --paper:   #ECE9E2;
+    --paper-2: #E4E0D6;
+    --ink:     #1C1B18;
+    --ink-2:   #57544C;
+    --ink-3:   #8C887E;
+    --line:    rgba(28,27,24,0.14);
+    --line-2:  rgba(28,27,24,0.08);
+    --rust:    #BC5A33;
+
+    /* status hues, used only as small legend marks + orb glow */
+    --st-work:   #4E73B8;
+    --st-perm:   #C79A33;
+    --st-done:   #4C8C5A;
+    --st-listen: #7E63B0;
+    --st-orb:    #D97757;
+
+    --sans: "Helvetica Neue", "Segoe UI", system-ui, Arial, sans-serif;
+    --mono: "Cascadia Code", "Cascadia Mono", ui-monospace, Consolas, monospace;
+
+    --maxw: 1060px;
+    --pad: clamp(1.25rem, 5vw, 3rem);
+    --aside: 156px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.025em; }
+  p { margin: 0; }
+  ::selection { background: var(--rust); color: var(--paper); }
+  :focus-visible { outline: 2px solid var(--rust); outline-offset: 3px; }
+
+  .wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: var(--pad); }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .kicker .n { color: var(--rust); }
+
+  /* ---------- header ---------- */
+  .site-head {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .site-head .row { display: flex; align-items: center; gap: 2rem; height: 60px; }
+  .wordmark { display: flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; }
+  .wordmark .glyph {
+    width: 15px; height: 15px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #6a6c6f, #2a2a2c 60%, #161617);
+    box-shadow: 0 0 0 1px rgba(28,27,24,0.12), 0 0 7px -1px var(--st-orb);
+  }
+  .site-nav { display: flex; gap: 1.7rem; margin-left: auto; font-size: 0.92rem; color: var(--ink-2); }
+  .site-nav a:hover { color: var(--ink); }
+  .head-cta { font-size: 0.9rem; }
+  @media (max-width: 680px) { .site-nav { display: none; } .head-cta { margin-left: auto; } }
+
+  /* ---------- buttons / links ---------- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5em;
+    font-family: var(--sans); font-weight: 500; font-size: 0.98rem;
+    padding: 0.74em 1.25em; border-radius: 5px; border: 1px solid var(--ink);
+    cursor: pointer; transition: background 0.18s, color 0.18s, border-color 0.18s;
+  }
+  .btn-ink { background: var(--ink); color: var(--paper); }
+  .btn-ink:hover { background: var(--rust); border-color: var(--rust); }
+  .btn-line { background: transparent; color: var(--ink); }
+  .btn-line:hover { background: var(--ink); color: var(--paper); }
+  .alink { display: inline-flex; align-items: center; gap: 0.4em; color: var(--ink-2); font-size: 0.95rem; }
+  .alink:hover { color: var(--rust); }
+  .alink .arr { transition: transform 0.18s; }
+  .alink:hover .arr { transform: translateX(3px); }
+
+  /* ---------- hero ---------- */
+  .hero { padding-top: clamp(3rem, 9vw, 6.5rem); padding-bottom: clamp(2.5rem, 6vw, 4.5rem); }
+  .hero h1 { font-size: clamp(2.5rem, 6.4vw, 4.7rem); line-height: 1.02; letter-spacing: -0.038em; max-width: 16ch; }
+  .hero h1 .soft { color: var(--ink-2); }
+  .hero-sub { margin-top: 1.6rem; max-width: 42ch; font-size: clamp(1.05rem, 2vw, 1.22rem); color: var(--ink-2); line-height: 1.55; }
+  .hero-actions { margin-top: 2.3rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+  .hero-meta { margin-top: 1.4rem; font-family: var(--mono); font-size: 0.78rem; color: var(--ink-3); letter-spacing: 0.02em; }
+
+  /* ---------- ambient dark band (the single visual moment) ---------- */
+  .band { background: var(--ink); color: var(--paper); }
+  .band .wrap { padding-block: clamp(3rem, 7vw, 5.5rem); }
+  .band-grid { display: grid; grid-template-columns: 230px 1fr; gap: clamp(2rem, 6vw, 5rem); align-items: center; }
+  @media (max-width: 720px) { .band-grid { grid-template-columns: 1fr; gap: 2.5rem; justify-items: start; } }
+
+  .orb-stage { position: relative; width: 200px; height: 200px; display: grid; place-items: center; }
+  .orb-halo {
+    position: absolute; width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--st-orb) 55%, transparent) 0%, transparent 62%);
+    filter: blur(8px); animation: breathe 5s ease-in-out infinite;
+  }
+  .orb {
+    position: relative; width: 124px; height: 124px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 28%, #76787e 0%, #3b3c41 40%, #222226 66%, #0c0c0e 100%);
+    box-shadow: inset 0 2px 5px rgba(255,255,255,0.22), inset 0 -12px 26px rgba(0,0,0,0.65), 0 22px 50px -18px rgba(0,0,0,0.9);
+  }
+  .orb::before {
+    content: ""; position: absolute; top: 14%; left: 22%; width: 38%; height: 30%; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.5), transparent 70%); filter: blur(1px);
+  }
+
+  .band h2 { font-size: clamp(1.5rem, 3.2vw, 2.15rem); line-height: 1.15; max-width: 18ch; }
+  .band p { margin-top: 1rem; color: color-mix(in srgb, var(--paper) 72%, transparent); max-width: 46ch; }
+  .legend { margin-top: 1.8rem; display: flex; flex-wrap: wrap; gap: 1rem 1.6rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--mono); font-size: 0.76rem; color: color-mix(in srgb, var(--paper) 78%, transparent); }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  /* ---------- index block layout ---------- */
+  .block { border-top: 1px solid var(--line); }
+  .block .wrap { padding-block: clamp(3.2rem, 6.5vw, 5.5rem); }
+  .block-grid { display: grid; grid-template-columns: var(--aside) 1fr; gap: clamp(1.6rem, 4vw, 3.5rem); }
+  @media (max-width: 720px) { .block-grid { grid-template-columns: 1fr; gap: 1.4rem; } }
+  .block-aside { position: sticky; top: 80px; align-self: start; }
+  @media (max-width: 720px) { .block-aside { position: static; } }
+  .block-title { font-size: clamp(1.5rem, 3vw, 2.05rem); line-height: 1.1; max-width: 20ch; }
+  .block-lead { margin-top: 1rem; color: var(--ink-2); max-width: 52ch; }
+
+  /* ---------- personas ---------- */
+  .people { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 0.5rem; }
+  @media (max-width: 720px) { .people { grid-template-columns: 1fr; } }
+  .person { padding: 0 1.6rem; }
+  .person:first-child { padding-left: 0; }
+  .person + .person { border-left: 1px solid var(--line); }
+  @media (max-width: 720px) {
+    .person { padding: 1.6rem 0; }
+    .person:first-child { padding-top: 0; }
+    .person + .person { border-left: 0; border-top: 1px solid var(--line); }
+  }
+  .person .pn { font-family: var(--mono); font-size: 0.8rem; color: var(--rust); }
+  .person h3 { margin-top: 0.7rem; font-size: 1.2rem; letter-spacing: -0.01em; }
+  .person .who { margin-top: 0.45rem; font-size: 0.86rem; color: var(--ink-3); }
+  .person .said { margin-top: 1rem; font-size: 0.98rem; color: var(--ink); }
+  .person ul { margin: 1rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+  .person li { font-size: 0.9rem; color: var(--ink-2); line-height: 1.45; }
+
+  /* ---------- features ---------- */
+  .feat-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 2.4rem 3rem; }
+  @media (max-width: 640px) { .feat-groups { grid-template-columns: 1fr; gap: 2rem; } }
+  .fg-label { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rust); padding-bottom: 0.8rem; border-bottom: 1px solid var(--line); }
+  .fg-list { margin: 1rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.95rem; }
+  .fg-list li b { font-weight: 600; }
+  .fg-list li p { margin-top: 0.15rem; font-size: 0.88rem; color: var(--ink-3); line-height: 1.45; }
+  .mono { font-family: var(--mono); font-size: 0.85em; color: var(--rust); }
+
+  /* ---------- install ---------- */
+  .req-list { margin: 0 0 1.8rem; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.7rem; font-size: 0.94rem; }
+  .req-list li { color: var(--ink-2); }
+  .req-list li b { color: var(--ink); font-weight: 600; }
+  .req-list .opt { color: var(--ink-3); }
+  .terminal { background: #16161A; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.2); }
+  .terminal-top { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.95rem; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .terminal-top i { width: 10px; height: 10px; border-radius: 50%; background: #34343b; }
+  .terminal-top span { font-family: var(--mono); font-size: 0.74rem; color: #7d7d86; margin-left: 0.3rem; }
+  .terminal-body { padding: 1.05rem 1.1rem; font-family: var(--mono); font-size: 0.8rem; line-height: 1.5; color: #c9c9cf; overflow-x: auto; }
+  .tline { display: block; }
+  .tline + .tline { margin-top: 1rem; }
+  .tline .c { color: #6f6f78; }
+  .tline .cmd { display: block; margin-top: 0.25rem; white-space: pre; color: #e7e7ea; }
+  .tline .cmd::before { content: "› "; color: var(--st-orb); }
+  .install-note { margin-top: 1.2rem; font-size: 0.86rem; color: var(--ink-2); line-height: 1.5; }
+  .install-note code, .req-list code { font-family: var(--mono); font-size: 0.85em; background: var(--paper-2); padding: 0.1em 0.35em; border-radius: 4px; }
+
+  /* ---------- faq ---------- */
+  .faq details { border-top: 1px solid var(--line); }
+  .faq details:last-child { border-bottom: 1px solid var(--line); }
+  .faq summary { list-style: none; cursor: pointer; padding: 1.1rem 0; font-weight: 600; font-size: 1.02rem; display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; font-family: var(--mono); color: var(--rust); font-size: 1.2rem; }
+  .faq details[open] summary::after { content: "–"; }
+  .faq .a { padding: 0 0 1.2rem; color: var(--ink-2); font-size: 0.95rem; max-width: 60ch; line-height: 1.55; }
+  .faq .a code { font-family: var(--mono); font-size: 0.85em; background: var(--paper-2); padding: 0.1em 0.35em; border-radius: 4px; }
+
+  /* ---------- footer ---------- */
+  .site-foot { border-top: 1px solid var(--line); }
+  .site-foot .row { display: flex; flex-wrap: wrap; gap: 1rem 1.6rem; align-items: center; padding-block: 2.2rem; font-size: 0.85rem; color: var(--ink-3); }
+  .site-foot .flinks { display: flex; gap: 1.4rem; margin-left: auto; }
+  .site-foot .flinks a:hover { color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .orb-halo { animation: none; }
+    * { transition-duration: 0.01ms !important; }
+  }
+  @keyframes breathe { 0%, 100% { opacity: 0.55; transform: scale(0.97); } 50% { opacity: 0.9; transform: scale(1.04); } }
+</style>
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap row">
+    <a class="wordmark" href="#top"><span class="glyph" aria-hidden="true"></span>Orbis</a>
+    <nav class="site-nav">
+      <a href="#use">사용</a>
+      <a href="#features">기능</a>
+      <a href="#install">설치</a>
+      <a href="https://github.com/poi82999/orbis" rel="noopener">GitHub</a>
+    </nav>
+    <a class="alink head-cta" id="navDownload" href="https://github.com/poi82999/orbis/releases/latest" rel="noopener">다운로드 <span class="arr" aria-hidden="true">↓</span></a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <p class="kicker">Windows 데스크톱 · Claude + ChatGPT</p>
+      <h1 style="margin-top:1.4rem;">화면 끝에 떠 있는<br /><span class="soft">Claude와 ChatGPT.</span></h1>
+      <p class="hero-sub">구독을 그대로 쓰는 작은 오브입니다. 보던 화면을 떠나지 않고 묻고, 색만 보고 상태를 압니다.</p>
+      <div class="hero-actions">
+        <a class="btn btn-ink" id="heroDownload" href="https://github.com/poi82999/orbis/releases/latest" rel="noopener">다운로드</a>
+        <a class="alink" href="#use">어떻게 쓰는지 보기 <span class="arr" aria-hidden="true">→</span></a>
+      </div>
+      <p class="hero-meta" id="heroMeta">Windows 10/11 · 무료 · 내 구독 그대로</p>
+    </div>
+  </section>
+
+  <!-- AMBIENT BAND -->
+  <section class="band">
+    <div class="wrap">
+      <div class="band-grid">
+        <div class="orb-stage">
+          <span class="orb-halo" aria-hidden="true"></span>
+          <span class="orb" aria-hidden="true"></span>
+        </div>
+        <div>
+          <h2>지켜보지 않아도, 곁눈질로 압니다.</h2>
+          <p>오브 하나가 화면 끝에 떠 있습니다. 색이 곧 상태입니다. 권한을 물으면 그 자리에서 한 번에 답하면 됩니다. 터미널로 돌아갈 일이 없습니다.</p>
+          <div class="legend">
+            <span><i style="background:var(--st-work)"></i> 작업 중</span>
+            <span><i style="background:var(--st-perm)"></i> 권한 대기</span>
+            <span><i style="background:var(--st-done)"></i> 완료</span>
+            <span><i style="background:var(--st-listen)"></i> 듣는 중</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PERSONAS -->
+  <section class="block" id="use">
+    <div class="wrap block-grid">
+      <div class="block-aside"><p class="kicker"><span class="n">01</span> &nbsp;사용</p></div>
+      <div class="block-main">
+        <h2 class="block-title">한 도구, 세 가지 결.</h2>
+        <p class="block-lead">코딩하든, 공부하든, 일하든 — 쓰는 방식만 다릅니다.</p>
+        <div class="people" style="margin-top:2.4rem;">
+
+          <div class="person">
+            <span class="pn">01</span>
+            <h3>개발자</h3>
+            <p class="who">Claude·ChatGPT를 매일 쓰는 사람</p>
+            <p class="said">권한 묻는 터미널을 더는 안 본다.</p>
+            <ul>
+              <li>오브 색으로 진행을 보고, 권한은 한 번에 응답</li>
+              <li>긴 작업은 <span class="mono">/bg</span>로 던져두고 계속 일</li>
+              <li>Claude와 Codex를 한 작업에 함께 투입</li>
+            </ul>
+          </div>
+
+          <div class="person">
+            <span class="pn">02</span>
+            <h3>공부하는 사람</h3>
+            <p class="who">강의·논문·자격증 자료를 보는 사람</p>
+            <p class="said">보던 자료를 떠나지 않는다.</p>
+            <ul>
+              <li>PDF 위에 띄워 그 자리에서 질문</li>
+              <li>드래그 한 번으로 요약·번역·풀이</li>
+              <li>말로 묻고 음성으로 듣는다</li>
+            </ul>
+          </div>
+
+          <div class="person">
+            <span class="pn">03</span>
+            <h3>직장인</h3>
+            <p class="who">메일·문서·반복 업무가 많은 사람</p>
+            <p class="said">반복은 맡긴다. 코드는 모른다.</p>
+            <ul>
+              <li>선택한 글을 번역·교정해 제자리에 붙여넣기</li>
+              <li>매일 같은 일은 스케줄로 무인 실행</li>
+              <li>폴더 정리·문서 작성은 컴퓨터 모드로</li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="block" id="features">
+    <div class="wrap block-grid">
+      <div class="block-aside"><p class="kicker"><span class="n">02</span> &nbsp;기능</p></div>
+      <div class="block-main">
+        <h2 class="block-title">한 오브 안에 든 것.</h2>
+        <div class="feat-groups" style="margin-top:2.2rem;">
+
+          <div class="fg">
+            <p class="fg-label">곁에</p>
+            <ul class="fg-list">
+              <li><b>떠 있는 오브와 사이드바</b><p>화면 전환 없이 보던 것 위에서 바로 묻습니다.</p></li>
+              <li><b>색 상태 · 원클릭 권한</b><p>작업·대기·완료를 색으로, 권한은 한 번에 응답.</p></li>
+            </ul>
+          </div>
+
+          <div class="fg">
+            <p class="fg-label">내 구독</p>
+            <ul class="fg-list">
+              <li><b>계정·AI 원클릭 전환</b><p>Claude·ChatGPT 여러 계정을 등록해 두고 바꿔 씁니다.</p></li>
+              <li><b>API 키 없음</b><p>추가 종량 요금이 없고, 데이터는 로컬에 남습니다.</p></li>
+              <li><b>사용량·한도</b><p>계정별 구독 한도와 토큰을 한 화면에서.</p></li>
+              <li><b>오케스트레이션</b><p>여러 계정으로 계획·검토를 나눠 한 작업에 투입.</p></li>
+            </ul>
+          </div>
+
+          <div class="fg">
+            <p class="fg-label">자동화</p>
+            <ul class="fg-list">
+              <li><b>백그라운드 작업</b><p><span class="mono">/bg</span>로 던져두면 끝날 때 알려줍니다.</p></li>
+              <li><b>무인 트리거</b><p>스케줄·파일 변경·이벤트로 알아서 실행.</p></li>
+              <li><b>자가수정 루프</b><p>실행하고 검증해, 실패하면 스스로 고칩니다.</p></li>
+              <li><b>컴퓨터 모드</b><p>화면을 보고 직접 조작하거나 로컬을 자동화.</p></li>
+            </ul>
+          </div>
+
+          <div class="fg">
+            <p class="fg-label">자비스</p>
+            <ul class="fg-list">
+              <li><b>화면 분석</b><p><span class="mono">Ctrl+Shift+Space</span> — 지금 화면을 읽고 음성으로 설명.</p></li>
+              <li><b>선택 어시스턴트</b><p><span class="mono">Ctrl+Shift+A</span> — 고른 글을 요약·번역·교정.</p></li>
+              <li><b>음성 입출력</b><p>받아쓰기로 묻고, 한국어 음성으로 답을 듣습니다.</p></li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="block" id="install">
+    <div class="wrap block-grid">
+      <div class="block-aside"><p class="kicker"><span class="n">03</span> &nbsp;설치</p></div>
+      <div class="block-main">
+        <h2 class="block-title">압축 풀고, 한 번 실행.</h2>
+        <p class="block-lead">Claude Code에 로그인돼 있으면 준비는 끝입니다.</p>
+        <ul class="req-list" style="margin-top:1.8rem;">
+          <li><b>Windows 10 / 11</b> — PowerShell 5.1 기본 포함</li>
+          <li><b>Claude Code</b> — 설치 후 본인 계정 로그인 <span class="opt">(필수)</span></li>
+          <li><b>Codex CLI</b> — ChatGPT 모드를 쓸 때 <span class="opt">(선택)</span></li>
+          <li><b>Node.js</b> — 컴퓨터 모드를 쓸 때 <span class="opt">(선택)</span></li>
+        </ul>
+        <div class="terminal">
+          <div class="terminal-top"><i></i><i></i><i></i><span>Windows PowerShell</span></div>
+          <div class="terminal-body">
+            <span class="tline"><span class="c"># 압축 푼 폴더에서 환경 점검</span><code class="cmd">powershell -ExecutionPolicy Bypass -File .\scripts\check-environment.ps1 -RequireClaude</code></span>
+            <span class="tline"><span class="c"># 설치 후 Ctrl+Alt+C 로 열기</span><code class="cmd">powershell -ExecutionPolicy Bypass -File install.ps1</code></span>
+          </div>
+        </div>
+        <p class="install-note">서명되지 않은 앱이라 SmartScreen 경고가 뜰 수 있습니다. 위처럼 <code>-ExecutionPolicy Bypass</code>로 실행하면 됩니다. 함께 받은 <code>.sha256</code>로 무결성을 확인할 수 있습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="block">
+    <div class="wrap block-grid">
+      <div class="block-aside"><p class="kicker"><span class="n">04</span> &nbsp;질문</p></div>
+      <div class="block-main">
+        <h2 class="block-title">먼저 궁금할 것.</h2>
+        <div class="faq" style="margin-top:1.6rem;">
+          <details>
+            <summary>추가 비용이나 API 키가 드나요?</summary>
+            <div class="a">아니요. 본인의 Claude Code / Codex CLI 로그인을 그대로 씁니다. 이미 내는 구독 외에 드는 비용이 없습니다.</div>
+          </details>
+          <details>
+            <summary>내 데이터는 어디에 있나요?</summary>
+            <div class="a">로컬 서버는 <code>127.0.0.1</code>에만 바인딩하고 토큰을 요구합니다. 계정 자격증명은 공유하지 않고, 설정과 기록은 <code>~/.claude/claude-bar</code> 로컬 폴더에 남습니다.</div>
+          </details>
+          <details>
+            <summary>어떤 AI를 쓰나요?</summary>
+            <div class="a">Claude(Claude Code)와 ChatGPT(Codex CLI)를 구독 계정 CLI 그대로 씁니다. 둘을 함께 쓰는 오케스트레이션 모드도 있습니다.</div>
+          </details>
+          <details>
+            <summary>코딩을 해야만 하나요?</summary>
+            <div class="a">아니요. 공부·문서·번역·자동화 같은 비개발 용도도 그대로 지원합니다.</div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLOSING -->
+  <section class="block">
+    <div class="wrap" style="text-align:center; padding-block: clamp(3.5rem,7vw,6rem);">
+      <h2 style="font-size:clamp(1.8rem,4vw,2.8rem);">곁에 두세요.</h2>
+      <p style="margin-top:1rem; color:var(--ink-2);">내가 이미 쓰는 구독을, 화면 어디에서나.</p>
+      <div style="margin-top:2rem; display:flex; gap:1.2rem; justify-content:center; flex-wrap:wrap;">
+        <a class="btn btn-ink" id="finalDownload" href="https://github.com/poi82999/orbis/releases/latest" rel="noopener">Orbis 다운로드</a>
+        <a class="btn btn-line" href="https://github.com/poi82999/orbis" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap row">
+    <span class="wordmark" style="font-size:0.95rem;"><span class="glyph" aria-hidden="true"></span>Orbis</span>
+    <span>Windows 10/11 · Claude + ChatGPT</span>
+    <nav class="flinks">
+      <a href="#features">기능</a>
+      <a href="#install">설치</a>
+      <a href="https://github.com/poi82999/orbis" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var REPO = "poi82999/orbis";
+  var FALLBACK = "https://github.com/" + REPO + "/releases/latest";
+  var btns = ["navDownload", "heroDownload", "finalDownload"].map(function (id) { return document.getElementById(id); });
+  var meta = document.getElementById("heroMeta");
+
+  function fmtSize(b) {
+    if (!b) { return ""; }
+    var mb = b / (1024 * 1024);
+    return (mb >= 10 ? Math.round(mb) : mb.toFixed(1)) + "MB";
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  fetch("https://api.github.com/repos/" + REPO + "/releases/latest", { headers: { "Accept": "application/vnd.github+json" } })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (d) {
+      var zip = (d.assets || []).filter(function (a) { return /\.zip$/i.test(a.name) && !/sha256/i.test(a.name); })[0];
+      var ver = d.tag_name || "";
+      var href = zip ? zip.browser_download_url : (d.html_url || FALLBACK);
+      btns.forEach(function (el) {
+        if (!el) { return; }
+        el.setAttribute("href", href);
+      });
+      if (meta && ver) {
+        meta.textContent = "Windows 10/11 · 무료 · 최신 " + ver + (zip ? " · " + fmtSize(zip.size) : "");
+      }
+    })
+    .catch(function () { /* no release yet / offline — fallback links stand */ });
+})();
+</script>
+
+</body>
+</html>
